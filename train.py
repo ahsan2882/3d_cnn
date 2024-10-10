@@ -29,7 +29,7 @@ def play_video(video_frames: List[np.ndarray[Any,
     cv2.destroyAllWindows()
 
 
-def main(source: str):
+def main(source: str,filename:str):
     device: torch.device = torch.device(
         'cuda' if torch.cuda.is_available() else 'cpu')
     video_dir = Path(source).resolve()
@@ -95,12 +95,12 @@ def main(source: str):
             print(f"Saving model... (Train Loss: {train_loss:.4f}, Train Acc: {
                   train_acc:.2f}%, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}%)")
             save_model(model, Path(Path(__file__).parent.resolve(),
-                       'model_data'), '3d_cnn.pth')
+                       'model_data'), filename)
 
         torch.cuda.empty_cache()
     plot_curves(train_losses, val_losses, train_accuracies, val_accuracies)
     save_model(model, Path(Path(__file__).parent.resolve(),
-               'model_data'), '3d_cnn.pth')
+               'model_data'), filename)
 
 
 if __name__ == "__main__":
@@ -108,7 +108,9 @@ if __name__ == "__main__":
         description='Train a 3D CNN model on video data.')
     parser.add_argument('--source', type=str, required=True,
                         help='Path to the dataset folder.')
+    parser.add_argument('--filename', type=str, required=True,
+                        help='filename for saving model')
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    main(args.source)
+    main(args.source,args.filename)
