@@ -29,7 +29,7 @@ def play_video(video_frames: List[np.ndarray[Any,
     cv2.destroyAllWindows()
 
 
-def main(source: str,filename:str):
+def main(source: str, filename: str):
     device: torch.device = torch.device(
         'cuda' if torch.cuda.is_available() else 'cpu')
     video_dir = Path(source).resolve()
@@ -95,12 +95,13 @@ def main(source: str,filename:str):
             print(f"Saving model... (Train Loss: {train_loss:.4f}, Train Acc: {
                   train_acc:.2f}%, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}%)")
             save_model(model, Path(Path(__file__).parent.resolve(),
-                       'model_data'), filename)
+                       'model_data'), f'{filename}.pth')
 
         torch.cuda.empty_cache()
-    plot_curves(train_losses, val_losses, train_accuracies, val_accuracies)
+    plot_curves(train_losses, val_losses,
+                train_accuracies, val_accuracies, filename)
     save_model(model, Path(Path(__file__).parent.resolve(),
-               'model_data'), filename)
+               'model_data'), f'{filename}.pth')
 
 
 if __name__ == "__main__":
@@ -113,4 +114,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    main(args.source,args.filename)
+    main(args.source, args.filename)

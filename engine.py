@@ -116,7 +116,7 @@ def plot_curves(
     train_losses: List[float],
     val_losses: List[float],
     train_accuracies: List[float],
-    val_accuracies: List[float]
+    val_accuracies: List[float],filename:str
 ) -> None:
     """
     Plots the training and validation loss and accuracy curves.
@@ -153,6 +153,6 @@ def plot_curves(
 
     plt.tight_layout()
     # You can specify the desired file format (e.g., .png, .jpg, .pdf)
-    plt.savefig('training_loss_accuracy.png')
+    plt.savefig(f'{filename}_curves.png')
 
     plt.close()
