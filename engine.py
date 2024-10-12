@@ -68,7 +68,7 @@ def train_step(model: torch.nn.Module,
 def val_step(model: torch.nn.Module,
              dataloader: DataLoader[Tuple[torch.Tensor, int]],
              loss_fn: torch.nn.Module,
-             device: torch.device) -> Tuple[float, float]:
+             device: torch.device, epoch: int) -> Tuple[float, float]:
     """
     Performs a validation step, aggregating predictions over all windows.
 
@@ -85,7 +85,7 @@ def val_step(model: torch.nn.Module,
     val_loss, val_acc = 0.0, 0.0
     video_predictions: Dict[int, Dict[str, List[torch.Tensor]]] = {}
     with torch.inference_mode():
-        for windows, labels in dataloader:
+        for windows, labels in tqdm(dataloader, desc=f"Validation Epoch {epoch + 1}", unit="batch"):
             windows, labels = windows.to(device), labels.to(device)
             outputs = model(windows)
             for i in range(windows.size(0)):
@@ -116,7 +116,7 @@ def plot_curves(
     train_losses: List[float],
     val_losses: List[float],
     train_accuracies: List[float],
-    val_accuracies: List[float],filename:str
+    val_accuracies: List[float], filename: str
 ) -> None:
     """
     Plots the training and validation loss and accuracy curves.

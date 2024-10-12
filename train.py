@@ -7,15 +7,15 @@ import cv2
 import numpy as np
 import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torchinfo import summary  # type: ignore
 
 from dataloaders import create_dataloaders
 from engine import plot_curves, train_step, val_step
 from model import ResNet3DModel
-from utils import save_model
+from utils import load_model, save_model
 
 NUM_EPOCHS = 100
 BATCH_SIZE = 8
-PATIENCE = 30
 
 
 def play_video(video_frames: List[np.ndarray[Any,
@@ -36,9 +36,13 @@ def main(source: str, filename: str):
 
     _, train_dataloader, _, val_dataloader, _, _, class_names = create_dataloaders(
         video_dir, BATCH_SIZE)
-    model = ResNet3DModel(num_classes=len(class_names)).to(device)
+    model = ResNet3DModel(num_classes=len(class_names))
+    model = load_model(model, Path(Path(__file__).parent.resolve(),
+                       'model_data', f'{filename}.pth').resolve())
+    model.to(device)
     loss_fn = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(  # type: ignore
+    optimizer = optimizer = torch.optim.Adam(  # type: ignore
+        # Only optimize unfrozen params
         model.parameters(),
         lr=0.01)
     scheduler = ReduceLROnPlateau(
@@ -48,7 +52,6 @@ def main(source: str, filename: str):
     best_train_loss = float('inf')
     best_val_acc = 0.0
     best_val_loss = float('inf')
-    patience_counter = 0
 
     train_losses: List[float] = []
     train_accuracies: List[float] = []
@@ -57,32 +60,39 @@ def main(source: str, filename: str):
 
     for epoch in range(NUM_EPOCHS):
         print(f"Epoch [{epoch + 1}/{NUM_EPOCHS}]")
+        if epoch == 0:
+            summary(model, input_size=(BATCH_SIZE, 3, 128, 112, 112), col_names=["input_size",
+                                                                                 "output_size",
+                                                                                 "num_params",
+                                                                                 "params_percent",
+                                                                                 "kernel_size",
+                                                                                 "trainable"])
+
         start_time = time.time()
         train_loss, train_acc = train_step(
             model, train_dataloader, loss_fn, optimizer, device, epoch)
         train_losses.append(train_loss)
         train_accuracies.append(train_acc)
-
+        torch.cuda.empty_cache()
         # Validation phase
-        val_loss, val_acc = val_step(model, val_dataloader, loss_fn, device)
+        val_loss, val_acc = val_step(
+            model, val_dataloader, loss_fn, device, epoch)
         val_losses.append(val_loss)
         val_accuracies.append(val_acc)
         scheduler.step(val_loss)
-
+        scheduler.get_last_lr()
+        torch.cuda.empty_cache()
+        if epoch == 0:
+            best_train_acc = train_acc
+            best_train_loss = train_loss
+            best_val_acc = val_acc
+            best_val_loss = val_loss
         # Print training and validation stats
         elapsed_time = time.time() - start_time
         remaining_time = (NUM_EPOCHS - epoch - 1) * elapsed_time
         print(f'Epoch [{epoch + 1}/{NUM_EPOCHS}], Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}%,Val Loss: {
-              val_loss:.4f}, Val Acc: {val_acc:.2f}%, Estimated Remaining Time: {remaining_time // 60:.0f} min {remaining_time % 60:.0f} sec')
+              val_loss:.4f}, Val Acc: {val_acc:.2f}%, learning rate: {scheduler.get_last_lr()}, Estimated Remaining Time: {remaining_time // 60:.0f} min {remaining_time % 60:.0f} sec')
 
-        # Early stopping
-        if val_loss < best_val_loss:
-            patience_counter = 0
-        else:
-            patience_counter += 1
-            if patience_counter >= PATIENCE:
-                print("Early stopping triggered!")
-                break
         if (train_loss < best_train_loss and
             train_acc > best_train_acc and
             val_loss < best_val_loss and
@@ -100,8 +110,6 @@ def main(source: str, filename: str):
         torch.cuda.empty_cache()
     plot_curves(train_losses, val_losses,
                 train_accuracies, val_accuracies, filename)
-    save_model(model, Path(Path(__file__).parent.resolve(),
-               'model_data'), f'{filename}.pth')
 
 
 if __name__ == "__main__":
